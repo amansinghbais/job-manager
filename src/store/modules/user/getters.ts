@@ -44,6 +44,9 @@ const getters: GetterTree <UserState, RootState> = {
     },
     getPinnedJobs(state) {
         return state.current ? (state.current as any)['pinnedJobs']?.jobs : []
+    },
+    getOmsRedirectionInfo(state) {
+        return state.omsRedirectionInfo
     }
 }
 export default getters;
