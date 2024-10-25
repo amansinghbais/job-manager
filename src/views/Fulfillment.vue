@@ -86,11 +86,32 @@
               <ion-label class="ion-text-wrap"><p>{{ translate("Unfulfilled orders that pass their auto cancelation date will be canceled automatically in HotWax Commerce. They will also be canceled in Shopify if upload for canceled orders is enabled.") }}</p></ion-label>
             </ion-item>
           </ion-card>
+
+          <ion-card>
+            <ion-card-header>
+              <ion-card-title>{{ translate("Feed") }}</ion-card-title>
+            </ion-card-header>
+            <ion-item button detail @click="viewMaargJobConfiguration('GNRT_FF_ORD_ITM_FEED')">
+              <ion-label class="ion-text-wrap">{{ translate("Generate order items feed") }}</ion-label>
+              <ion-label slot="end">{{ getMaargJobStatus("GNRT_FF_ORD_ITM_FEED") }}</ion-label>
+            </ion-item>
+            <ion-item button detail @click="viewMaargJobConfiguration('SND_FF_ACK_FEED')">
+              <ion-label class="ion-text-wrap">{{ translate("Send shopify acknowledge feed") }}</ion-label>
+              <ion-label slot="end">{{ getMaargJobStatus("SND_FF_ACK_FEED") }}</ion-label>
+            </ion-item>
+
+            <ion-item lines="none">
+              <ion-label class="ion-text-wrap">
+                <p>{{ translate("Generated order items feed and send fulfillment acknowlegment feed to shopify.") }}</p>
+              </ion-label>
+            </ion-item>
+          </ion-card>
           <MoreJobs v-if="getMoreJobs({...jobEnums, ...initialLoadJobEnums}, enumTypeId).length" :jobs="getMoreJobs({...jobEnums, ...initialLoadJobEnums}, enumTypeId)" />
         </section>
 
-        <aside class="desktop-only" v-if="isDesktop" v-show="currentJob">
-          <JobConfiguration :status="currentJobStatus" :type="freqType" :key="currentJob"/>
+        <aside class="desktop-only" v-if="isDesktop" v-show="currentJob || Object.keys(currentMaargJob).length">
+          <JobConfiguration v-if="currentJob" :status="currentJobStatus" :type="freqType" :key="currentJob"/>
+          <MaargJobConfiguration v-else-if="Object.keys(currentMaargJob).length" :key="currentMaargJob" />
         </aside>
       </main>
     </ion-content>
@@ -121,12 +142,14 @@ import { useStore } from "@/store";
 import { useRouter } from 'vue-router'
 import { mapGetters } from "vuex";
 import JobConfiguration from '@/components/JobConfiguration.vue';
-import { generateJobCustomParameters, hasError, isFutureDate, showToast, prepareRuntime, hasJobDataError } from '@/utils';
+import MaargJobConfiguration from '@/components/MaargJobConfiguration.vue';
+import { generateJobCustomParameters, getCronString, hasError, isFutureDate, showToast, prepareRuntime, hasJobDataError } from '@/utils';
 import emitter from '@/event-bus';
 import { JobService } from '@/services/JobService'
 import MoreJobs from '@/components/MoreJobs.vue';
 import { Actions, hasPermission } from '@/authorization'
 import logger from '@/logger';
+import cronstrue from "cronstrue"
 
 export default defineComponent({
   name: 'Fulfillment',
@@ -146,6 +169,7 @@ export default defineComponent({
     IonToggle,
     IonToolbar,
     JobConfiguration,
+    MaargJobConfiguration,
     MoreJobs
   },
   data() {
@@ -159,16 +183,19 @@ export default defineComponent({
       isDesktop: isPlatform('desktop'),
       autoCancelDays: '',
       enumTypeId: 'FULFILLMENT_SYS_JOB',
-      initialLoadJobEnums: JSON.parse(process.env?.VUE_APP_INITIAL_JOB_ENUMS as string) as any
+      initialLoadJobEnums: JSON.parse(process.env?.VUE_APP_INITIAL_JOB_ENUMS as string) as any,
+      maargJobNames: JSON.parse(process.env.VUE_APP_FULFILLMENT_MAARG_JOB_NAMES as string) as any,
     }
   },
   computed: {
     ...mapGetters({
       getJobStatus: 'job/getJobStatus',
       getJob: 'job/getJob',
+      getMaargJob: 'job/getMaargJob',
       currentEComStore: 'user/getCurrentEComStore',
       getTemporalExpr: 'job/getTemporalExpr',
-      getMoreJobs: 'job/getMoreJobs'
+      getMoreJobs: 'job/getMoreJobs',
+      currentMaargJob: 'job/getCurrentMaargJob'
     }),
     autoCancelCheckDaily(): boolean {
       const status = this.getJobStatus(this.jobEnums["AUTO_CNCL_DAL"]);
@@ -238,6 +265,7 @@ export default defineComponent({
           "enumTypeId": "FULFILLMENT_SYS_JOB"
         }
       });
+      await this.store.dispatch("job/fetchMaargJobs", "FULFILLMENT_SYS_JOB");
       if (this.currentEComStore.productStoreId) {
         this.getAutoCancelDays();
       }
@@ -295,7 +323,25 @@ export default defineComponent({
       return this.getTemporalExpr(this.getJobStatus(this.jobEnums[enumId]))?.description ?
         this.getTemporalExpr(this.getJobStatus(this.jobEnums[enumId]))?.description :
         translate('Disabled')
-    }
+    },
+    getMaargJobStatus(id: string) {
+      const job = this.getMaargJob(this.maargJobNames[id])
+      return (job?.paused === "N" && job?.cronExpression) ? this.getCronString(job.cronExpression) ? this.getCronString(job.cronExpression) : job.cronExpression : 'Disabled'
+    },
+    async viewMaargJobConfiguration(id: any) {
+      const jobName = this.maargJobNames[id];
+      const job = this.getMaargJob(jobName);
+
+      if(job) {
+        await this.store.dispatch("job/updateCurrentMaargJob", job)
+      }
+
+      this.currentJob = ""
+      if(!this.isJobDetailAnimationCompleted) {
+        emitter.emit('playAnimation');
+        this.isJobDetailAnimationCompleted = true;
+      }
+    },
   },
   mounted () {
     this.fetchJobs();
@@ -312,6 +358,7 @@ export default defineComponent({
 
     return {
       Actions,
+      getCronString,
       hasPermission,
       router,
       store,

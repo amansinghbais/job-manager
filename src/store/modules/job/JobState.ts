@@ -33,4 +33,6 @@ export default interface JobState {
       runtime: any,
       frequency: any,
     },
+    maargJobs:  any,
+    currentMaargJob: any
 }

@@ -85,6 +85,12 @@ const getters: GetterTree <JobState, RootState> = {
     getGlobalFreq: (state) => {
       return state.bulk.frequency;
     },
+    getMaargJob: (state) => (jobTypeEnumId: string): any => {
+      return state.maargJobs[jobTypeEnumId] ? state.maargJobs[jobTypeEnumId] : {}
+    },
+    getCurrentMaargJob: (state) => {
+      return state.currentMaargJob
+    }
   }
 
   export default getters;

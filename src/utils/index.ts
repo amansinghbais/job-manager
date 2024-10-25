@@ -5,6 +5,7 @@ import { DateTime } from "luxon";
 import logger from "@/logger";
 import { translate } from "@hotwax/dxp-components";
 import { Plugins } from '@capacitor/core';
+import cronstrue from "cronstrue"
 
 // TODO Use separate files for specific utilities
 
@@ -307,6 +308,39 @@ const generateJobCustomOptions = (job: any) => {
   }
 }
 
+const generateMaargJobCustomOptions = (job: any) => {
+  let inputParameters = job?.serviceInParameters ? JSON.parse(JSON.stringify(job?.serviceInParameters)) : []
+  const optionalParameters: Array<any> = [];
+  const requiredParameters: Array<any> = [];
+
+  // removing some fields that we don't want user to edit, and for which the values will be added programatically
+  const excludeParameters = ['productStoreIds']
+  inputParameters = inputParameters.filter((parameter: any) =>!excludeParameters.includes(parameter.name))
+
+  inputParameters.map((parameter: any) => {
+    if(parameter.required === "true") {
+      requiredParameters.push({
+        name: parameter.name,
+        value: job?.parameterValues && job?.parameterValues[parameter.name] && job?.parameterValues[parameter.name] !== 'null' ? convertToString({ value: job?.parameterValues[parameter.name], type: parameter.type }) : '',   // added check for null as we don't want to pass null as a value in the params
+        type: parameter.type,
+        default: parameter.default
+      })
+    } else {
+      optionalParameters.push({
+        name: parameter.name,
+        value: job?.parameterValues && job?.parameterValues[parameter.name] && job?.parameterValues[parameter.name] !== 'null' ? convertToString({ value: job?.parameterValues[parameter.name], type: parameter.type }) : '',   // added check for null as we don't want to pass null as a value in the params
+        type: parameter.type,
+        default: parameter.default
+      })
+    }
+  })
+
+  return {
+    optionalParameters,
+    requiredParameters
+  }
+}
+
 const getNowTimestamp = () => {
   return DateTime.now().toISO();
 }
@@ -341,6 +375,23 @@ const copyToClipboard = async (value: string, text?: string) => {
   });
 }
 
+function getDateAndTime(time: any) {
+  return time ? DateTime.fromMillis(time).toLocaleString({ ...DateTime.DATETIME_MED, hourCycle: "h12" }) : "-";
+}
+
+function timeTillRun(endTime: any) {
+  const timeDiff = DateTime.fromMillis(endTime).diff(DateTime.local());
+  return DateTime.local().plus(timeDiff).toRelative();
+}
+
+function getCronString(cronExpression: any) {
+  try {
+    return cronstrue.toString(cronExpression)
+  } catch(e) {
+    logger.error(e)
+    return ""
+  }
+}
 
 export {
   copyToClipboard,
@@ -350,6 +401,9 @@ export {
   generateAllowedRunTimes,
   generateJobCustomParameters,
   generateJobCustomOptions,
+  generateMaargJobCustomOptions,
+  getCronString,
+  getDateAndTime,
   handleDateTimeInput,
   hasJobDataError,
   showToast,
@@ -358,5 +412,6 @@ export {
   jsonToCsv,
   JsonToCsvOption,
   isFutureDate,
-  prepareRuntime
+  prepareRuntime,
+  timeTillRun
 }

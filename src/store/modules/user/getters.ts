@@ -27,6 +27,10 @@ const getters: GetterTree <UserState, RootState> = {
         if (!baseURL) baseURL = state.instanceUrl;
         return baseURL.startsWith('http') ? baseURL.includes('/api') ? baseURL : `${baseURL}/api/` : `https://${baseURL}.hotwax.io/api/`;
     },
+    getMaargBaseUrl (state) {
+        const url = state.omsRedirectionInfo.url
+        return url.startsWith('http') ? url.includes('/rest/s1/admin') ? url : `${url}/rest/s1/admin/` : `https://${url}.hotwax.io/rest/s1/admin/`;
+    },
     getCurrentShopifyConfig (state) {
         return state.currentShopifyConfig;
     },

@@ -58,6 +58,12 @@ const mutations: MutationTree <JobState> = {
     [types.JOB_BULK_RUNTIME_UPDATED] (state, payload) {
         state.bulk.runtime = payload.runtime;
     },
+    [types.JOB_MAARG_JOBS_UPDATED] (state, payload) {
+        state.maargJobs = payload
+    },
+    [types.JOB_CURRENT_MAARG_JOB_UPDATED] (state, payload) {
+        state.currentMaargJob = payload
+    },
     [types.JOB_BULK_CLEARED] (state) {
         state.bulk = {
             jobs: [],

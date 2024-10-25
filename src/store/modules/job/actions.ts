@@ -1077,5 +1077,63 @@ const actions: ActionTree<JobState, RootState> = {
       commit(types.JOB_REPORTS_UPDATED, { jobs: jobs, total: total ? total : 0 });
     }
   },
+
+  // Actions handling Maarg jobs
+
+  async fetchMaargJobs({ commit }, jobTypeEnumId){
+    let resp = {} as any;
+    const maargJobs = {} as any;
+
+    try {
+      resp = await JobService.fetchMaargJobs({ jobTypeEnumId })
+      if(!hasError(resp) && resp.data?.length) {
+        const jobNames = resp.data.map((job: any) => job.jobName);
+
+        const jobResponses = await Promise.allSettled(jobNames.map((jobName: string) => {
+          return JobService.fetchMaargJobInfo(jobName)
+        }))
+
+        jobResponses.map((response: any) => {
+          if(response.status === "fulfilled") {
+            maargJobs[response.value?.data?.jobDetail?.jobName] = response.value?.data?.jobDetail
+            Object.values(maargJobs).map((job: any) => {
+              const paramValue = {} as any;
+              job.serviceJobParameters.map((param: any) => {
+                paramValue[param.parameterName] = param.parameterValue
+              })
+              job["parameterValues"] = paramValue
+            })
+            
+          }
+        })
+      } else {
+        throw resp;
+      }
+    } catch(error: any) {
+      logger.error(error);
+    }
+    commit(types.JOB_MAARG_JOBS_UPDATED, maargJobs);
+  },
+  
+  async updateMaargJob({ commit, state }, jobName) {
+    const jobs = JSON.parse(JSON.stringify(state.maargJobs));
+
+    try {
+      const resp = await JobService.fetchMaargJobInfo(jobName);
+      if(!hasError(resp)) {
+        jobs[jobName] = resp.data?.jobDetail
+        commit(types.JOB_MAARG_JOBS_UPDATED, jobs);
+        commit(types.JOB_CURRENT_MAARG_JOB_UPDATED, resp.data?.jobDetail);
+      } else {
+        throw resp;
+      }
+    } catch(error: any) {
+      logger.error(error);
+    }
+  },
+  
+  async updateCurrentMaargJob({ commit }, payload) {
+    commit(types.JOB_CURRENT_MAARG_JOB_UPDATED, payload);
+  }
 }
 export default actions;

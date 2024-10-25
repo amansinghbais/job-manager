@@ -42,6 +42,8 @@ const jobModule: Module<JobState, RootState> = {
         runtime: '',
         frequency: '',
       },
+      maargJobs: {},
+      currentMaargJob: {}
     },
     getters,
     actions,
